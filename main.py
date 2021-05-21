@@ -5,7 +5,6 @@ import glob
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from pandas.api.types import is_string_dtype
-from pandas.api.types import is_datetime64_any_dtype as is_datetime
 from datetime import datetime
 from datetime import date
 import os
@@ -48,7 +47,7 @@ def calcula_edad(fecha_nac):
 def extract(ruta):
 
     df_union=[]
-    files = glob.glob(ruta+'/*')
+    files = glob.glob(os.path.join(ruta, '*.txt'))
     for f in files:
 
         header = ['rut', 'dv', 'nombre',
@@ -61,9 +60,11 @@ def extract(ruta):
         widths = [7,1,20,25,9,10,10,6,50,30,4,2,  #Clientes
                 50,8,9,1                         #Emails  y Telefonos                         
                 ]
+        
+        tipo_dato = {'rut': str, 'dv': str,'telefono': str}
 
         df = pd.read_fwf(f, names=header,
-                            header=None, widths=widths)
+                            header=None, widths=widths, dtype=tipo_dato)
         df_union.append(df)
         data = pd.concat(df_union,sort=False,ignore_index=True)
     return data
@@ -74,11 +75,12 @@ def transform(data):
     data = norm_data(data)
     data = data[['rut','dv','nombre','apellido', 'genero', 'fecha_nacimiento','fecha_vencimiento','deuda','direccion','ocupacion','correo','telefono','estatus_contacto','prioridad']]
     data['age'] = data['fecha_nacimiento'].apply(calcula_edad)
-    data['age_group'] = pd.cut(x=data['age'], bins=[0,20, 30, 40, 50,60,200], labels=['1','2','3','4','5','6'])
+    data['age_group'] = pd.cut(x=data['age'], bins=[0,20, 30, 40, 50,60,200], labels=[1,2,3,4,5,6])
     data['delinquency'] = (datetime.now() - pd.to_datetime(data['fecha_vencimiento'])).dt.days
 
     #Crear catalogo de clientes con el mayor numero de telefonos validos por ocupacion
     bco_cat = data.loc[data['estatus_contacto'] == 'VALIDO',['ocupacion','rut']].value_counts().reset_index().sort_values(['ocupacion', 0], ascending = (False, False)).drop_duplicates('ocupacion', keep='first')
+    #Asignar el valor booleano para clientes tomando en cuenta el catalogo antes creado.
     data = data.assign(best_contact_ocupation=data.rut.isin(bco_cat.rut).astype(int))
     del bco_cat
     data['fiscal_id'] = data.rut.astype(str) + data.dv.astype(str)
@@ -112,7 +114,7 @@ def transform(data):
                                                                         'estatus_contacto': 'status',
                                                                         'prioridad': 'priority', 
                                                                         })
-    phones = phones[phones['phone'] > 0]
+    phones.dropna(subset=['phone'],inplace = True)
     
     del data
     
@@ -153,5 +155,3 @@ if __name__ == "__main__":
     print('Inicia proceso de carga...')    
     load(customers,emails,phones)
     print('Proceso de carga concluido.') 
-    
-    
