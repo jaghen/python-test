@@ -140,9 +140,6 @@ def load(customers,emails,phones):
     del emails
     del phones
 
-    #Validar si es posible dejar en email y phone solo aquellos que contengan el dato.
-    #pd.read_sql('SELECT * FROM customers', conn)
-
 if __name__ == "__main__":
     
     print('Por favor capture la ruta donde se encuentran los archivos a procesar:')
